@@ -1,62 +1,246 @@
-# nexo-md-to-pdf-cli
+# NEXO CLI
 
-CLI to convert Markdown files into corporate-ready PDFs with the NEXO document layout.
+Official command-line interface for converting Markdown files into polished PDFs using the hosted NEXO conversion API.
+
+This package is designed for developers, technical writers, consultants, and teams that want the same PDF output available in the NEXO web product, but from scripts, terminals, CI jobs, or bulk local workflows.
+
+## Why this exists
+
+The NEXO web app is the best place for richer document workflows, previews, and attachment-heavy conversions. The CLI exists for a different use case:
+
+- run conversions from the terminal
+- automate repetitive document generation
+- process multiple Markdown files quickly
+- keep output consistent with the hosted NEXO product
+
+Instead of generating PDFs locally with its own rendering stack, the CLI sends conversion jobs to the same backend used by the public NEXO experience.
+
+That means:
+
+- the PDF layout stays aligned with the product
+- free-mode rules stay centralized
+- usage is still tracked in the NEXO backend
+- CLI traffic is identified separately from website traffic
 
 ## Install
+
+Global install:
 
 ```bash
 npm install -g nexo-md-to-pdf-cli
 ```
 
-Or run without global install:
+After installation, the command is:
+
+```bash
+nexo --help
+```
+
+You can also run it without a global install:
 
 ```bash
 npx nexo-md-to-pdf-cli --help
 ```
 
-## How it works
+## Quick start
 
-The CLI sends conversion jobs to the hosted NEXO API at `https://nexo.speck-solutions.com.br/api/free/convert`.
-
-That means:
-
-- PDFs are generated with the same backend used by the website
-- free-mode limits stay aligned with the public product
-- usage continues to be counted in Supabase
-- the backend can distinguish CLI usage from website usage
-
-## Usage
+Convert one Markdown file:
 
 ```bash
 nexo release-summary.md
+```
+
+Write to a specific output path:
+
+```bash
 nexo release-summary.md --output ./release-summary.pdf
+```
+
+Convert several files at once:
+
+```bash
 nexo a.md b.md c.md --output-dir ./pdfs
+```
+
+Use a custom logo:
+
+```bash
 nexo release-summary.md --logo ./brand.svg --logo-tone light
+```
+
+Target another environment:
+
+```bash
 nexo release-summary.md --api-base-url http://localhost:3000
 ```
 
+## How it works
+
+By default, the CLI sends requests to:
+
+```text
+https://nexo.speck-solutions.com.br/api/free/convert
+```
+
+Each input `.md` file is processed as its own conversion job. This makes bulk usage easier while preserving the same per-conversion rules enforced by the hosted free flow.
+
+The CLI identifies itself with a dedicated request header, so the backend can distinguish:
+
+- website usage
+- CLI usage
+
+This keeps metrics and operational visibility clean without splitting rendering logic across multiple codebases.
+
+## Command reference
+
+### Basic usage
+
+```text
+nexo <file.md>
+nexo <file.md> --output <file.pdf>
+nexo <file-a.md> <file-b.md> --output-dir <directory>
+```
+
+### Options
+
+- `--output <file>`: write the generated PDF to a specific path for a single Markdown input
+- `--output-dir <directory>`: choose the output directory when converting multiple files
+- `--logo <file>`: provide an optional logo in `png`, `jpg`, `webp`, or `svg`
+- `--logo-tone <dark|light>`: choose the logo header background tone, default is `dark`
+- `--api-base-url <url>`: point the CLI to another NEXO environment such as local development or staging
+- `-h, --help`: show command help
+
+### Output behavior
+
+- without `--output-dir`, the generated PDF is written next to the original Markdown file
+- `--output` can only be used with a single Markdown input
+- each input file generates one PDF
+- the CLI exits with a non-zero status if one or more conversions fail
+
+## Current scope
+
+This first version of the CLI intentionally focuses on the most common command-line workflow:
+
+- Markdown input
+- optional custom logo
+- hosted conversion through the NEXO API
+
+The following are intentionally out of scope for now:
+
+- attachments
+- multi-asset document packaging
+- interactive preview flows
+
+For richer document assembly, use the web application at [nexo.speck-solutions.com.br](https://nexo.speck-solutions.com.br).
+
 ## Free-mode limits
 
-This package keeps the same unauthenticated limits used by the NEXO free flow:
+The CLI follows the same unauthenticated limits enforced by the public NEXO free flow.
+
+Current limits:
 
 - up to 3 Markdown documents per request
 - up to 120,000 characters per document
-- up to 180,000 characters total
+- up to 180,000 characters total per request
 - optional custom logo up to 2 MB
 - accepted logo formats: `png`, `jpeg`, `webp`, `svg`
 
-The CLI processes each input `.md` file as its own conversion job, which is convenient for batch usage while preserving the same per-conversion free-mode rules.
+Because this CLI sends each input file as a separate conversion job, those limits apply to each generated PDF request individually.
 
-Attachments are intentionally out of scope for the current CLI version. For attachment-heavy workflows, use the NEXO web app.
+## Examples
+
+Single document:
+
+```bash
+nexo weekly-report.md
+```
+
+Single document with explicit output:
+
+```bash
+nexo weekly-report.md --output ./exports/weekly-report.pdf
+```
+
+Bulk conversion:
+
+```bash
+nexo docs/release-1.md docs/release-2.md docs/release-3.md --output-dir ./exports
+```
+
+Local backend:
+
+```bash
+nexo weekly-report.md --api-base-url http://localhost:3000
+```
+
+## Error behavior
+
+The CLI validates payloads before sending them and also surfaces hosted API errors clearly.
+
+Typical failure cases include:
+
+- unsupported logo file type
+- using `--output` with more than one Markdown input
+- exceeding hosted free-mode limits
+- API errors returned by the NEXO backend
+- network failures when the hosted service is unreachable
+
+For successful conversions, the CLI prints a line like:
+
+```text
+[ok] /absolute/input.md -> /absolute/output.pdf
+```
+
+For failed conversions, it prints:
+
+```text
+[erro] /absolute/input.md -> reason
+```
 
 ## Development
 
+Install dependencies:
+
 ```bash
 yarn install
+```
+
+Type-check:
+
+```bash
+yarn typecheck
+```
+
+Build:
+
+```bash
 yarn build
+```
+
+Run locally without publishing:
+
+```bash
 node dist/cli.js --help
 ```
 
+Test the command locally via npm linking:
+
+```bash
+npm link
+nexo --help
+```
+
+## Relationship to the main NEXO repo
+
+This repository contains the distributable CLI package.
+
+The main NEXO product lives here:
+
+- Website: [nexo.speck-solutions.com.br](https://nexo.speck-solutions.com.br)
+- Main repository: [github.com/DaviSpeck/nexo](https://github.com/DaviSpeck/nexo)
+
+If you want the browser experience, previews, richer document flows, or the primary product documentation, start from the main repository.
+
 ## License
 
-MIT
+[MIT](./LICENSE)
