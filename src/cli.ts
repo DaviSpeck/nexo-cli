@@ -1,19 +1,30 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { validateFreeConvertRequest } from "./free-convert.js";
+
+type LogoTone = "dark" | "light";
 
 type CliOptions = {
   output?: string;
   outputDir?: string;
   logo?: string;
-  logoTone: "dark" | "light";
+  logoTone?: LogoTone;
   apiBaseUrl?: string;
   help: boolean;
 };
 
+type CliConfig = {
+  defaultLogoPath?: string;
+  defaultLogoTone?: LogoTone;
+};
+
 const DEFAULT_API_BASE_URL = "https://nexo.speck-solutions.com.br";
+const DEFAULT_LOGO_TONE: LogoTone = "dark";
+const CONFIG_DIR = join(homedir(), ".nexo");
+const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 function printHelp() {
   console.log(`nexo
@@ -24,11 +35,14 @@ Usage:
   nexo a.md b.md c.md --output-dir ./pdfs
   nexo file.md --logo ./logo.svg --logo-tone light
   nexo file.md --api-base-url http://localhost:3000
+  nexo config set-logo ./logo.svg --logo-tone light
+  nexo config clear-logo
+  nexo config show
 
 Options:
   --output <file>          Write the output PDF to a specific path for one markdown file
   --output-dir <dir>       Output directory when converting multiple files
-  --logo <file>            Optional logo (png, jpg, webp, or svg)
+  --logo <file>            Optional logo (png, jpg, webp, or svg); overrides the saved default
   --logo-tone <dark|light> Header background tone for the logo (default: dark)
   --api-base-url <url>     NEXO API base URL (default: ${DEFAULT_API_BASE_URL})
   --help, -h               Show this help message
@@ -38,6 +52,7 @@ Rules:
   - Each .md file becomes a separate PDF, which makes bulk processing easier
   - Without --output-dir, the PDF is saved next to the original file
   - Usage is tracked by the NEXO backend and marked with CLI as the source
+  - A saved default logo can be configured once and reused automatically
   - Attachments are not supported in this CLI version
 `);
 }
@@ -88,16 +103,105 @@ function toCliOptions(values: Record<string, string | boolean | undefined>): Cli
     output: typeof values.output === "string" ? values.output : undefined,
     outputDir: typeof values["output-dir"] === "string" ? values["output-dir"] : undefined,
     logo: typeof values.logo === "string" ? values.logo : undefined,
-    logoTone: values["logo-tone"] === "light" ? "light" : "dark",
+    logoTone: values["logo-tone"] === "light" || values["logo-tone"] === "dark"
+      ? values["logo-tone"]
+      : undefined,
     apiBaseUrl:
       typeof values["api-base-url"] === "string" ? values["api-base-url"] : undefined,
     help: Boolean(values.help)
   };
 }
 
+async function loadCliConfig(): Promise<CliConfig> {
+  try {
+    const raw = await readFile(CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(raw) as CliConfig;
+    return {
+      defaultLogoPath:
+        typeof parsed.defaultLogoPath === "string" ? parsed.defaultLogoPath : undefined,
+      defaultLogoTone:
+        parsed.defaultLogoTone === "light" || parsed.defaultLogoTone === "dark"
+          ? parsed.defaultLogoTone
+          : undefined
+    };
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "";
+    if (code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function saveCliConfig(config: CliConfig) {
+  await mkdir(CONFIG_DIR, { recursive: true });
+  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf8");
+}
+
 function buildApiUrl(options: CliOptions) {
   const baseUrl = (options.apiBaseUrl || process.env.NEXO_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
   return `${baseUrl}/api/free/convert`;
+}
+
+async function handleConfigCommand(args: string[], options: CliOptions) {
+  const [action, value] = args;
+
+  if (!action || options.help) {
+    console.log(`nexo config
+
+Usage:
+  nexo config set-logo ./logo.svg --logo-tone light
+  nexo config clear-logo
+  nexo config show
+`);
+    return;
+  }
+
+  if (action === "set-logo") {
+    if (!value) {
+      throw new Error("Use `nexo config set-logo <file>`.");
+    }
+
+    const absoluteLogoPath = resolve(value);
+    await encodeFileAsDataUrl(absoluteLogoPath);
+
+    const currentConfig = await loadCliConfig();
+    const nextConfig: CliConfig = {
+      defaultLogoPath: absoluteLogoPath,
+      defaultLogoTone: options.logoTone ?? currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE
+    };
+
+    await saveCliConfig(nextConfig);
+
+    console.log(`[nexo] Saved default logo: ${absoluteLogoPath}`);
+    console.log(`[nexo] Saved default logo tone: ${nextConfig.defaultLogoTone}`);
+    console.log(`[nexo] Config path: ${CONFIG_PATH}`);
+    return;
+  }
+
+  if (action === "clear-logo") {
+    await saveCliConfig({});
+    console.log("[nexo] Cleared the saved default logo.");
+    console.log(`[nexo] Config path: ${CONFIG_PATH}`);
+    return;
+  }
+
+  if (action === "show") {
+    const currentConfig = await loadCliConfig();
+    console.log(`[nexo] Config path: ${CONFIG_PATH}`);
+    if (!currentConfig.defaultLogoPath) {
+      console.log("[nexo] No default logo configured.");
+      return;
+    }
+
+    console.log(`[nexo] Default logo: ${currentConfig.defaultLogoPath}`);
+    console.log(
+      `[nexo] Default logo tone: ${currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE}`
+    );
+    return;
+  }
+
+  throw new Error(`Unknown config command: ${action}`);
 }
 
 async function convertMarkdownFile(
@@ -170,6 +274,11 @@ async function main() {
   const options = toCliOptions(parsed.values);
   const inputs = parsed.positionals;
 
+  if (inputs[0] === "config") {
+    await handleConfigCommand(inputs.slice(1), options);
+    return;
+  }
+
   if (options.help || inputs.length === 0) {
     printHelp();
     process.exit(inputs.length === 0 && !options.help ? 1 : 0);
@@ -179,18 +288,51 @@ async function main() {
     throw new Error("Use --output only when converting a single .md file.");
   }
 
-  const customLogoData = options.logo ? await encodeFileAsDataUrl(options.logo) : null;
+  const cliConfig = await loadCliConfig();
+  const effectiveLogoPath = options.logo ?? cliConfig.defaultLogoPath;
+  const effectiveLogoTone = options.logoTone ?? cliConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE;
+  const customLogoData = effectiveLogoPath ? await encodeFileAsDataUrl(effectiveLogoPath) : null;
   let failures = 0;
+  const total = inputs.length;
 
-  for (const inputPath of inputs) {
+  console.log(
+    `[nexo] Starting ${total} conversion${total === 1 ? "" : "s"} using ${buildApiUrl(options)}`
+  );
+
+  if (effectiveLogoPath) {
+    const logoSource = options.logo ? "command line" : "saved config";
+    console.log(`[nexo] Using logo from ${logoSource}: ${resolve(effectiveLogoPath)}`);
+    console.log(`[nexo] Using logo tone: ${effectiveLogoTone}`);
+  }
+
+  for (const [index, inputPath] of inputs.entries()) {
+    const absoluteInputPath = resolve(inputPath);
+    const outputPath = deriveOutputPath(absoluteInputPath, options);
+
     try {
-      const outputPath = await convertMarkdownFile(inputPath, options, customLogoData);
-      console.log(`[ok] ${resolve(inputPath)} -> ${outputPath}`);
+      console.log(`[${index + 1}/${total}] Reading ${absoluteInputPath}`);
+      console.log(`[${index + 1}/${total}] Sending conversion request...`);
+
+      const writtenOutputPath = await convertMarkdownFile(
+        inputPath,
+        { ...options, logoTone: effectiveLogoTone },
+        customLogoData
+      );
+      console.log(`[ok] ${absoluteInputPath} -> ${writtenOutputPath}`);
     } catch (error) {
       failures += 1;
       const reason = error instanceof Error ? error.message : String(error);
-      console.error(`[error] ${resolve(inputPath)} -> ${reason}`);
+      console.error(`[error] ${absoluteInputPath} -> ${reason}`);
+      console.error(`[${index + 1}/${total}] Expected output path: ${outputPath}`);
     }
+  }
+
+  if (failures === 0) {
+    console.log(`[nexo] Completed ${total} conversion${total === 1 ? "" : "s"} successfully.`);
+  } else {
+    console.error(
+      `[nexo] Finished with ${failures} failure${failures === 1 ? "" : "s"} out of ${total} conversion${total === 1 ? "" : "s"}.`
+    );
   }
 
   if (failures > 0) {

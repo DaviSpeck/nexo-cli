@@ -62,10 +62,17 @@ Convert several files at once:
 nexo a.md b.md c.md --output-dir ./pdfs
 ```
 
-Use a custom logo:
+Use a one-off custom logo:
 
 ```bash
 nexo release-summary.md --logo ./brand.svg --logo-tone light
+```
+
+Save a default logo once and reuse it:
+
+```bash
+nexo config set-logo ./brand.svg --logo-tone light
+nexo release-summary.md
 ```
 
 Target another environment:
@@ -99,13 +106,16 @@ This keeps metrics and operational visibility clean without splitting rendering 
 nexo <file.md>
 nexo <file.md> --output <file.pdf>
 nexo <file-a.md> <file-b.md> --output-dir <directory>
+nexo config set-logo <file>
+nexo config clear-logo
+nexo config show
 ```
 
 ### Options
 
 - `--output <file>`: write the generated PDF to a specific path for a single Markdown input
 - `--output-dir <directory>`: choose the output directory when converting multiple files
-- `--logo <file>`: provide an optional logo in `png`, `jpg`, `webp`, or `svg`
+- `--logo <file>`: provide an optional one-off logo in `png`, `jpg`, `webp`, or `svg`; this overrides the saved default
 - `--logo-tone <dark|light>`: choose the logo header background tone, default is `dark`
 - `--api-base-url <url>`: point the CLI to another NEXO environment such as local development or staging
 - `-h, --help`: show command help
@@ -117,12 +127,48 @@ nexo <file-a.md> <file-b.md> --output-dir <directory>
 - each input file generates one PDF
 - the CLI exits with a non-zero status if one or more conversions fail
 
+## Saved default logo
+
+If you always use the same brand asset, you can save it once and stop repeating `--logo` in every command.
+
+Set the default logo:
+
+```bash
+nexo config set-logo ./brand.svg --logo-tone light
+```
+
+Inspect the saved config:
+
+```bash
+nexo config show
+```
+
+Clear the saved logo:
+
+```bash
+nexo config clear-logo
+```
+
+After saving a default logo, plain conversions automatically reuse it:
+
+```bash
+nexo weekly-report.md
+```
+
+The CLI stores this configuration locally at:
+
+```text
+~/.nexo/config.json
+```
+
+If you pass `--logo` in a conversion command, that explicit file takes precedence over the saved default.
+
 ## Current scope
 
 This first version of the CLI intentionally focuses on the most common command-line workflow:
 
 - Markdown input
-- optional custom logo
+- optional custom logo, including a saved default logo
 - hosted conversion through the NEXO API
 
 The following are intentionally out of scope for now:
@@ -165,6 +211,13 @@ Bulk conversion:
 
 ```bash
 nexo docs/release-1.md docs/release-2.md docs/release-3.md --output-dir ./exports
+```
+
+Saved default logo:
+
+```bash
+nexo config set-logo ./assets/brand.svg --logo-tone light
+nexo docs/release-1.md
 ```
 
 Local backend:
