@@ -194,7 +194,7 @@ For successful conversions, the CLI prints a line like:
 For failed conversions, it prints:
 
 ```text
-[erro] /absolute/input.md -> reason
+[error] /absolute/input.md -> reason
 ```
 
 ## Development

@@ -18,27 +18,27 @@ const DEFAULT_API_BASE_URL = "https://nexo.speck-solutions.com.br";
 function printHelp() {
   console.log(`nexo
 
-Uso:
-  nexo arquivo.md
-  nexo arquivo.md --output ./saida.pdf
+Usage:
+  nexo file.md
+  nexo file.md --output ./output.pdf
   nexo a.md b.md c.md --output-dir ./pdfs
-  nexo arquivo.md --logo ./logo.svg --logo-tone light
-  nexo arquivo.md --api-base-url http://localhost:3000
+  nexo file.md --logo ./logo.svg --logo-tone light
+  nexo file.md --api-base-url http://localhost:3000
 
-Opcoes:
-  --output <arquivo>       Define o PDF de saida para um unico markdown
-  --output-dir <pasta>     Pasta de saida quando houver varios arquivos
-  --logo <arquivo>         Logo opcional (png, jpg, webp ou svg)
-  --logo-tone <dark|light> Fundo da logo no cabecalho (padrao: dark)
-  --api-base-url <url>     Base da API NEXO (padrao: ${DEFAULT_API_BASE_URL})
-  --help, -h               Exibe esta ajuda
+Options:
+  --output <file>          Write the output PDF to a specific path for one markdown file
+  --output-dir <dir>       Output directory when converting multiple files
+  --logo <file>            Optional logo (png, jpg, webp, or svg)
+  --logo-tone <dark|light> Header background tone for the logo (default: dark)
+  --api-base-url <url>     NEXO API base URL (default: ${DEFAULT_API_BASE_URL})
+  --help, -h               Show this help message
 
-Regras:
-  - Cada conversao respeita os mesmos limites do modo Free/nao autenticado da NEXO
-  - Cada .md vira um PDF separado, o que facilita processamento em massa
-  - Sem --output-dir, o PDF e salvo ao lado do arquivo original
-  - O uso e contabilizado no backend da NEXO com origem identificada como CLI
-  - Anexos nao sao suportados nesta versao da CLI
+Rules:
+  - Each conversion follows the same free-mode limits as the unauthenticated NEXO flow
+  - Each .md file becomes a separate PDF, which makes bulk processing easier
+  - Without --output-dir, the PDF is saved next to the original file
+  - Usage is tracked by the NEXO backend and marked with CLI as the source
+  - Attachments are not supported in this CLI version
 `);
 }
 
@@ -63,7 +63,7 @@ async function encodeFileAsDataUrl(filePath: string) {
   const absolutePath = resolve(filePath);
   const mimeType = detectMimeType(absolutePath);
   if (!mimeType) {
-    throw new Error(`Formato de arquivo nao suportado em ${absolutePath}.`);
+    throw new Error(`Unsupported file format in ${absolutePath}.`);
   }
 
   const bytes = await readFile(absolutePath);
@@ -142,7 +142,7 @@ async function convertMarkdownFile(
     const message =
       typeof errorBody?.message === "string"
         ? errorBody.message
-        : `Falha na conversao (${response.status}).`;
+        : `Conversion failed (${response.status}).`;
     throw new Error(message);
   }
 
@@ -176,7 +176,7 @@ async function main() {
   }
 
   if (options.output && inputs.length > 1) {
-    throw new Error("Use --output apenas quando houver um unico arquivo .md.");
+    throw new Error("Use --output only when converting a single .md file.");
   }
 
   const customLogoData = options.logo ? await encodeFileAsDataUrl(options.logo) : null;
@@ -189,7 +189,7 @@ async function main() {
     } catch (error) {
       failures += 1;
       const reason = error instanceof Error ? error.message : String(error);
-      console.error(`[erro] ${resolve(inputPath)} -> ${reason}`);
+      console.error(`[error] ${resolve(inputPath)} -> ${reason}`);
     }
   }
 
