@@ -1,0 +1,53 @@
+{
+  "name": "nexo-md-to-pdf-cli",
+  "version": "0.1.0",
+  "description": "CLI to convert Markdown files into corporate-ready PDFs with the NEXO document layout.",
+  "type": "module",
+  "bin": {
+    "nexo": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "assets/brand",
+    "README.md",
+    "LICENSE"
+  ],
+  "homepage": "https://nexo.speck-solutions.com.br",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DaviSpeck/nexo-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DaviSpeck/nexo-cli/issues"
+  },
+  "keywords": [
+    "markdown",
+    "markdown-to-pdf",
+    "pdf-generation",
+    "cli",
+    "nodejs",
+    "playwright",
+    "developer-tools",
+    "technical-writing",
+    "docs-as-code",
+    "release-notes"
+  ],
+  "author": "Davi Speck",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "yarn clean && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "prepack": "yarn build"
+  },
+  "dependencies": {
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.8.2"
+  }
+}
