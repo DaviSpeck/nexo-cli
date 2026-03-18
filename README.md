@@ -89,7 +89,7 @@ By default, the CLI sends requests to:
 https://nexo.speck-solutions.com.br/api/free/convert
 ```
 
-Each input `.md` file is processed as its own conversion job. This makes bulk usage easier while preserving the same per-conversion rules enforced by the hosted free flow.
+Each input `.md` file is converted into its own PDF output, but free mode is capped at 3 Markdown files per CLI run so the hosted limits remain consistent.
 
 The CLI identifies itself with a dedicated request header, so the backend can distinguish:
 
@@ -114,7 +114,7 @@ nexo config show
 ### Options
 
 - `--output <file>`: write the generated PDF to a specific path for a single Markdown input
-- `--output-dir <directory>`: choose the output directory when converting multiple files
+- `--output-dir <directory>`: choose the output directory when converting multiple files; free mode still allows at most 3 input files per command
 - `--logo <file>`: provide an optional one-off logo in `png`, `jpg`, `webp`, or `svg`; this overrides the saved default
 - `--logo-tone <dark|light>`: choose the logo header background tone, default is `dark`
 - `--api-base-url <url>`: point the CLI to another NEXO environment such as local development or staging
@@ -185,13 +185,13 @@ The CLI follows the same unauthenticated limits enforced by the public NEXO free
 
 Current limits:
 
-- up to 3 Markdown documents per request
+- up to 3 Markdown documents per CLI run
 - up to 120,000 characters per document
 - up to 180,000 characters total per request
 - optional custom logo up to 2 MB
 - accepted logo formats: `png`, `jpeg`, `webp`, `svg`
 
-Because this CLI sends each input file as a separate conversion job, those limits apply to each generated PDF request individually.
+When converting multiple files, the CLI enforces the same free-mode ceiling before sending requests, so commands with more than 3 Markdown files are rejected immediately.
 
 ## Examples
 

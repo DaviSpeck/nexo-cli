@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { validateFreeConvertRequest } from "./free-convert.js";
+import { FREE_LIMITS } from "./free-limits.js";
 
 type LogoTone = "dark" | "light";
 
@@ -49,7 +50,7 @@ Options:
 
 Rules:
   - Each conversion follows the same free-mode limits as the unauthenticated NEXO flow
-  - Each .md file becomes a separate PDF, which makes bulk processing easier
+  - Free mode accepts up to ${FREE_LIMITS.documents.maxFiles} .md files per CLI run
   - Without --output-dir, the PDF is saved next to the original file
   - Usage is tracked by the NEXO backend and marked with CLI as the source
   - A saved default logo can be configured once and reused automatically
@@ -286,6 +287,12 @@ async function main() {
 
   if (options.output && inputs.length > 1) {
     throw new Error("Use --output only when converting a single .md file.");
+  }
+
+  if (inputs.length > FREE_LIMITS.documents.maxFiles) {
+    throw new Error(
+      `Free mode supports up to ${FREE_LIMITS.documents.maxFiles} markdown files per run. Received ${inputs.length}.`
+    );
   }
 
   const cliConfig = await loadCliConfig();
