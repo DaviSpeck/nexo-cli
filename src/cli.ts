@@ -86,7 +86,7 @@ async function encodeFileAsDataUrl(filePath: string) {
   return {
     fileName: basename(absolutePath),
     mimeType,
-    dataUrl: `data:${mimeType};base64,${bytes.toString("base64")}`
+    dataUrl: `data:${mimeType};base64,${bytes.toString("base64")}`,
   };
 }
 
@@ -94,22 +94,32 @@ function deriveOutputPath(inputPath: string, options: CliOptions) {
   if (options.output) return resolve(options.output);
 
   const inputAbsolutePath = resolve(inputPath);
-  const outputDir = options.outputDir ? resolve(options.outputDir) : dirname(inputAbsolutePath);
+  const outputDir = options.outputDir
+    ? resolve(options.outputDir)
+    : dirname(inputAbsolutePath);
   const outputFileName = `${basename(inputAbsolutePath, extname(inputAbsolutePath))}.pdf`;
   return join(outputDir, outputFileName);
 }
 
-function toCliOptions(values: Record<string, string | boolean | undefined>): CliOptions {
+function toCliOptions(
+  values: Record<string, string | boolean | undefined>,
+): CliOptions {
   return {
     output: typeof values.output === "string" ? values.output : undefined,
-    outputDir: typeof values["output-dir"] === "string" ? values["output-dir"] : undefined,
+    outputDir:
+      typeof values["output-dir"] === "string"
+        ? values["output-dir"]
+        : undefined,
     logo: typeof values.logo === "string" ? values.logo : undefined,
-    logoTone: values["logo-tone"] === "light" || values["logo-tone"] === "dark"
-      ? values["logo-tone"]
-      : undefined,
+    logoTone:
+      values["logo-tone"] === "light" || values["logo-tone"] === "dark"
+        ? values["logo-tone"]
+        : undefined,
     apiBaseUrl:
-      typeof values["api-base-url"] === "string" ? values["api-base-url"] : undefined,
-    help: Boolean(values.help)
+      typeof values["api-base-url"] === "string"
+        ? values["api-base-url"]
+        : undefined,
+    help: Boolean(values.help),
   };
 }
 
@@ -119,14 +129,17 @@ async function loadCliConfig(): Promise<CliConfig> {
     const parsed = JSON.parse(raw) as CliConfig;
     return {
       defaultLogoPath:
-        typeof parsed.defaultLogoPath === "string" ? parsed.defaultLogoPath : undefined,
+        typeof parsed.defaultLogoPath === "string"
+          ? parsed.defaultLogoPath
+          : undefined,
       defaultLogoTone:
         parsed.defaultLogoTone === "light" || parsed.defaultLogoTone === "dark"
           ? parsed.defaultLogoTone
-          : undefined
+          : undefined,
     };
   } catch (error) {
-    const code = error instanceof Error && "code" in error ? String(error.code) : "";
+    const code =
+      error instanceof Error && "code" in error ? String(error.code) : "";
     if (code === "ENOENT") {
       return {};
     }
@@ -140,8 +153,17 @@ async function saveCliConfig(config: CliConfig) {
 }
 
 function buildApiUrl(options: CliOptions) {
-  const baseUrl = (options.apiBaseUrl || process.env.NEXO_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+  const baseUrl = (
+    options.apiBaseUrl ||
+    process.env.NEXO_API_BASE_URL ||
+    DEFAULT_API_BASE_URL
+  ).replace(/\/+$/, "");
   return `${baseUrl}/api/free/convert`;
+}
+
+function normalizeMarkdownForPdf(markdown: string) {
+  // Keep punctuation consistent with the current PDF writing style.
+  return markdown.replace(/\u2014/g, "\u2013");
 }
 
 async function handleConfigCommand(args: string[], options: CliOptions) {
@@ -169,13 +191,16 @@ Usage:
     const currentConfig = await loadCliConfig();
     const nextConfig: CliConfig = {
       defaultLogoPath: absoluteLogoPath,
-      defaultLogoTone: options.logoTone ?? currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE
+      defaultLogoTone:
+        options.logoTone ?? currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE,
     };
 
     await saveCliConfig(nextConfig);
 
     console.log(`[nexo] Saved default logo: ${absoluteLogoPath}`);
-    console.log(`[nexo] Saved default logo tone: ${nextConfig.defaultLogoTone}`);
+    console.log(
+      `[nexo] Saved default logo tone: ${nextConfig.defaultLogoTone}`,
+    );
     console.log(`[nexo] Config path: ${CONFIG_PATH}`);
     return;
   }
@@ -197,7 +222,7 @@ Usage:
 
     console.log(`[nexo] Default logo: ${currentConfig.defaultLogoPath}`);
     console.log(
-      `[nexo] Default logo tone: ${currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE}`
+      `[nexo] Default logo tone: ${currentConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE}`,
     );
     return;
   }
@@ -208,26 +233,28 @@ Usage:
 async function convertMarkdownFile(
   inputPath: string,
   options: CliOptions,
-  customLogoData: Awaited<ReturnType<typeof encodeFileAsDataUrl>> | null
+  customLogoData: Awaited<ReturnType<typeof encodeFileAsDataUrl>> | null,
 ) {
   const absoluteInputPath = resolve(inputPath);
-  const markdown = await readFile(absoluteInputPath, "utf8");
+  const markdown = normalizeMarkdownForPdf(
+    await readFile(absoluteInputPath, "utf8"),
+  );
   const requestBody = {
     documents: [
       {
         markdown,
         fileName: basename(absoluteInputPath),
-        attachments: []
-      }
+        attachments: [],
+      },
     ],
     ...(customLogoData
       ? {
           customLogo: {
             ...customLogoData,
-            tone: options.logoTone
-          }
+            tone: options.logoTone,
+          },
         }
-      : {})
+      : {}),
   };
 
   const requestBytes = Buffer.byteLength(JSON.stringify(requestBody));
@@ -237,9 +264,9 @@ async function convertMarkdownFile(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-nexo-client-source": "cli"
+      "x-nexo-client-source": "cli",
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -267,9 +294,9 @@ async function main() {
       logo: { type: "string" },
       "logo-tone": { type: "string" },
       "api-base-url": { type: "string" },
-      help: { type: "boolean", short: "h" }
+      help: { type: "boolean", short: "h" },
     },
-    allowPositionals: true
+    allowPositionals: true,
   });
 
   const options = toCliOptions(parsed.values);
@@ -291,24 +318,29 @@ async function main() {
 
   if (inputs.length > FREE_LIMITS.documents.maxFiles) {
     throw new Error(
-      `Free mode supports up to ${FREE_LIMITS.documents.maxFiles} markdown files per run. Received ${inputs.length}.`
+      `Free mode supports up to ${FREE_LIMITS.documents.maxFiles} markdown files per run. Received ${inputs.length}.`,
     );
   }
 
   const cliConfig = await loadCliConfig();
   const effectiveLogoPath = options.logo ?? cliConfig.defaultLogoPath;
-  const effectiveLogoTone = options.logoTone ?? cliConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE;
-  const customLogoData = effectiveLogoPath ? await encodeFileAsDataUrl(effectiveLogoPath) : null;
+  const effectiveLogoTone =
+    options.logoTone ?? cliConfig.defaultLogoTone ?? DEFAULT_LOGO_TONE;
+  const customLogoData = effectiveLogoPath
+    ? await encodeFileAsDataUrl(effectiveLogoPath)
+    : null;
   let failures = 0;
   const total = inputs.length;
 
   console.log(
-    `[nexo] Starting ${total} conversion${total === 1 ? "" : "s"} using ${buildApiUrl(options)}`
+    `[nexo] Starting ${total} conversion${total === 1 ? "" : "s"} using ${buildApiUrl(options)}`,
   );
 
   if (effectiveLogoPath) {
     const logoSource = options.logo ? "command line" : "saved config";
-    console.log(`[nexo] Using logo from ${logoSource}: ${resolve(effectiveLogoPath)}`);
+    console.log(
+      `[nexo] Using logo from ${logoSource}: ${resolve(effectiveLogoPath)}`,
+    );
     console.log(`[nexo] Using logo tone: ${effectiveLogoTone}`);
   }
 
@@ -323,22 +355,26 @@ async function main() {
       const writtenOutputPath = await convertMarkdownFile(
         inputPath,
         { ...options, logoTone: effectiveLogoTone },
-        customLogoData
+        customLogoData,
       );
       console.log(`[ok] ${absoluteInputPath} -> ${writtenOutputPath}`);
     } catch (error) {
       failures += 1;
       const reason = error instanceof Error ? error.message : String(error);
       console.error(`[error] ${absoluteInputPath} -> ${reason}`);
-      console.error(`[${index + 1}/${total}] Expected output path: ${outputPath}`);
+      console.error(
+        `[${index + 1}/${total}] Expected output path: ${outputPath}`,
+      );
     }
   }
 
   if (failures === 0) {
-    console.log(`[nexo] Completed ${total} conversion${total === 1 ? "" : "s"} successfully.`);
+    console.log(
+      `[nexo] Completed ${total} conversion${total === 1 ? "" : "s"} successfully.`,
+    );
   } else {
     console.error(
-      `[nexo] Finished with ${failures} failure${failures === 1 ? "" : "s"} out of ${total} conversion${total === 1 ? "" : "s"}.`
+      `[nexo] Finished with ${failures} failure${failures === 1 ? "" : "s"} out of ${total} conversion${total === 1 ? "" : "s"}.`,
     );
   }
 
